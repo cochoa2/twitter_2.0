@@ -1,28 +1,21 @@
 <template>
   <q-page class="grid">
-    <div class="row col justify-center">
-      <q-card class="my-card q-pa-md q-ma-md" flat bordered>
-        <q-card-section horizontal>
-          <q-icon
-            name="record_voice_over"
-            class="q-pa-sm justify-center"
-          ></q-icon>
-          <q-input
-            v-model="userPost"
-            filled
-            autogrow
-            clearable
-            placeholder="How are you feeling today?"
-            ><q-btn round dense flat icon="send" @click="sendUserPost"></q-btn
-          ></q-input>
-        </q-card-section>
+    <div class="row col q-pa-md justify-center">
+      <q-card class="q-pa-md" flat bordered style="width: 482px">
+        <q-input
+          v-model="userPost"
+          autogrow
+          clearable
+          placeholder="How are you feeling today?"
+          ><q-btn round dense flat icon="send" @click="sendUserPost"></q-btn
+        ></q-input>
       </q-card>
     </div>
     <div class="row col justify-center">
       <q-list>
         <UserPostsComponent
           v-for="post in followerPosts"
-          :key="post.postText"
+          :key="post._id"
           v-bind="post"
         />
       </q-list>
@@ -31,31 +24,9 @@
 </template>
 
 <script>
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onMounted } from "vue";
 import UserPostsComponent from "components/UserPostsComponent.vue";
-
-const followerPostsList = [
-  {
-    userName: "Carlos Ochoa",
-    date: "2023-01-24",
-    postText: "I really want to land this job!",
-  },
-  {
-    userName: "Jordan Ochoa",
-    date: "2023-01-24",
-    postText: "I wish Carlos would stop talking about wanting a job....",
-  },
-  {
-    userName: "Nugget Ochoa",
-    date: "2023-01-23",
-    postText: "I really want to fk up Noah!!!!",
-  },
-  {
-    userName: "Veronica Ochoa",
-    date: "2023-01-22",
-    postText: "Umm Umm Ummmmmmmmmmm",
-  },
-];
+import { api } from "boot/axios";
 
 export default defineComponent({
   name: "IndexPage",
@@ -66,12 +37,77 @@ export default defineComponent({
 
   setup() {
     const userPost = ref("");
+    const followerPostsList = ref([]);
+    const fetchUserPost = () =>
+      api
+        .post("", {
+          query: `
+          query GetUserPosts($amount: Int) {
+            getUserPosts(amount: $amount) {
+              _id
+              createdAt
+              name
+              postText
+              thumbsDown
+              thumbsUp
+              comments {
+                _id
+                createdAt
+                name
+                postText
+                thumbsDown
+                thumbsUp
+              }
+            }
+          }
+          `,
+          variables: {
+            amount: 25,
+          },
+        })
+        .then((result) => {
+          followerPostsList.value = result.data.data.getUserPosts;
+        });
+
+    onMounted(() => {
+      fetchUserPost();
+    });
     return {
       userPost,
       followerPosts: followerPostsList,
 
       sendUserPost() {
-        console.log(userPost.value);
+        api
+          .post(
+            "",
+            {
+              query: `mutation Mutation($userPostInput: UserPostInput) {
+            createUserPost(UserPostInput: $userPostInput) {
+              createdAt
+              name
+              postText
+              thumbsDown
+              thumbsUp
+            }
+          }`,
+              variables: {
+                userPostInput: {
+                  name: "Jack O'Donnel",
+                  postText: userPost.value,
+                },
+              },
+            },
+            {
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          )
+          .then((result) => {
+            let tmp = [result.data.data.createUserPost];
+            tmp.push(...followerPostsList.value);
+            followerPostsList.value = tmp;
+          });
         userPost.value = "";
       },
     };
